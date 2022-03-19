@@ -6,7 +6,10 @@
     "build:all": "npm run build:oracle && npm run build:caller",
     "deploy:oracle": "cd oracle && npx truffle migrate --network extdev --reset -all && cd ..",
     "deploy:caller": "cd caller && npx truffle migrate --network extdev --reset -all && cd ..",
-    "deploy:all": "npm run deploy:oracle && npm run deploy:caller"
+    "deploy:all": "npm run deploy:oracle && npm run deploy:caller",
+    "dev-deploy:oracle": "cd oracle && npx truffle migrate --reset -all && cd ..",
+    "dev-deploy:caller": "cd caller && npx truffle migrate --reset -all && cd ..",
+    "dev-deploy:all": "npm run dev-deploy:oracle && npm run dev-deploy:caller"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.5.0",
