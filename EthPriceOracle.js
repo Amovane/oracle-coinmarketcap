@@ -1,4 +1,4 @@
-const axios = require("axios");
+require("dotenv").config();
 const BN = require("bn.js");
 const common = require("./utils/common.js");
 const SLEEP_INTERVAL = process.env.SLEEP_INTERVAL || 2000;
@@ -7,6 +7,7 @@ const PRIVATE_KEY_FILE_NAME =
 const CHUNK_SIZE = process.env.CHUNK_SIZE || 3;
 const MAX_RETRIES = process.env.MAX_RETRIES || 5;
 const OracleJSON = require("./oracle/build/contracts/EthPriceOracle.json");
+const { default: request } = require("./utils/http.js");
 var pendingRequests = [];
 
 async function getOracleContract(web3js) {
@@ -56,13 +57,12 @@ async function processQueue(oracleContract, ownerAddress) {
 }
 
 async function retrieveLatestEthPrice() {
-  const resp = await axios({
-    url: "https://api.binance.com/api/v3/ticker/price",
-    params: {
-      symbol: "ETHUSDT",
-    },
-    method: "get",
-  });
+  const resp = await request(
+    "get",
+    "https://api.binance.com/api/v3/ticker/price",
+    { symbol: "ETHUSDT" }
+  );
+
   return resp.data.price;
 }
 

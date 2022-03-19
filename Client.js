@@ -1,3 +1,4 @@
+require("dotenv").config();
 const common = require("./utils/common.js");
 const SLEEP_INTERVAL = process.env.SLEEP_INTERVAL || 2000;
 const PRIVATE_KEY_FILE_NAME =
