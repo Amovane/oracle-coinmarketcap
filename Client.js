@@ -1,59 +1,49 @@
 require("dotenv").config();
+const { Contract } = require("ethers");
 const common = require("./utils/common.js");
-const SLEEP_INTERVAL = process.env.SLEEP_INTERVAL || 2000;
+const SLEEP_INTERVAL = parseInt(process.env.SLEEP_INTERVAL) || 10_000;
 const PRIVATE_KEY_FILE_NAME =
   process.env.PRIVATE_KEY_FILE || "./caller/caller_private_key";
 const CallerJSON = require("./caller/build/contracts/CallerContract.json");
 const OracleJSON = require("./oracle/build/contracts/EthPriceOracle.json");
 
-async function getCallerContract(web3js) {
-  const networkId = await web3js.eth.net.getId();
-  return new web3js.eth.Contract(
+async function getCallerContract(provider) {
+  const networkId = (await provider.getNetwork()).chainId;
+  return new Contract(
+    CallerJSON.networks[networkId].address,
     CallerJSON.abi,
-    CallerJSON.networks[networkId].address
+    provider.getSigner()
   );
 }
 
 async function filterEvents(callerContract) {
-  callerContract.events.PriceUpdatedEvent(
-    { filter: {} },
-    async (err, event) => {
-      if (err) console.error("Error on event", err);
-      console.log(
-        "* New PriceUpdated event. ethPrice: " + event.returnValues.ethPrice
-      );
-    }
-  );
-  callerContract.events.ReceivedNewRequestIdEvent(
-    { filter: {} },
-    async (err, event) => {
-      if (err) console.error("Error on event", err);
-    }
-  );
+  callerContract.on("PriceUpdatedEvent", async (ethPrice, id) => {
+    console.log(
+      `* New PriceUpdated event. requestId: ${id} ethPrice: ${ethPrice}`
+    );
+  });
+
+  callerContract.on("ReceivedNewRequestIdEvent", async (id) => {
+    console.log(`* New ReceivedNewRequestId event. requestId: ${id}`);
+  });
 }
 
 async function init() {
-  const { ownerAddress, web3js, client } = common.loadAccount(
-    PRIVATE_KEY_FILE_NAME
-  );
-  const callerContract = await getCallerContract(web3js);
+  const wallet = common.loadAccount(PRIVATE_KEY_FILE_NAME);
+  const callerContract = await getCallerContract(wallet.provider);
+
+  const networkId = (await wallet.provider.getNetwork()).chainId;
+  const oracleAddress = OracleJSON.networks[networkId].address;
+  await callerContract.setOracleInstanceAddress(oracleAddress);
+
   filterEvents(callerContract);
-  return { callerContract, ownerAddress, client, web3js };
+
+  return callerContract;
 }
 
 (async () => {
-  const { callerContract, ownerAddress, client, web3js } = await init();
-  process.on("SIGINT", () => {
-    console.log("Calling client.disconnect()");
-    client.disconnect();
-    process.exit();
-  });
-  const networkId = await web3js.eth.net.getId();
-  const oracleAddress = OracleJSON.networks[networkId].address;
-  await callerContract.methods
-    .setOracleInstanceAddress(oracleAddress)
-    .send({ from: ownerAddress });
+  const callerContract = await init();
   setInterval(async () => {
-    await callerContract.methods.updateEthPrice().send({ from: ownerAddress });
+    await callerContract.updateEthPrice();
   }, SLEEP_INTERVAL);
 })();
