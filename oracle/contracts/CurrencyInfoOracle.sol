@@ -3,26 +3,34 @@ pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./CallerContractInterface.sol";
+import "./CurrencyInfo.sol";
 
-contract EthPriceOracle is Ownable {
+contract CurrencyInfoOracle is Ownable {
     uint256 private randNonce = 0;
     uint256 private modulus = 1000;
     mapping(uint256 => bool) pendingRequests;
-    event GetLatestEthPriceEvent(address callerAddress, uint256 id);
-    event SetLatestEthPriceEvent(uint256 ethPrice, address callerAddress);
+    event GetCurrencyInfoEvent(
+        address callerAddress,
+        string currId,
+        uint256 id
+    );
+    event UpdateCurrencyInfoEvent(
+        CurrencyInfo currencyInfo,
+        address callerAddress
+    );
 
-    function getLatestEthPrice() public returns (uint256) {
+    function getCurrencyInfo(string memory currId) public returns (uint256) {
         randNonce++;
         uint256 id = uint256(
             keccak256(abi.encodePacked(block.timestamp, msg.sender, randNonce))
         ) % modulus;
         pendingRequests[id] = true;
-        emit GetLatestEthPriceEvent(msg.sender, id);
+        emit GetCurrencyInfoEvent(msg.sender, currId, id);
         return id;
     }
 
-    function setLatestEthPrice(
-        uint256 _ethPrice,
+    function updateCurrencyInfo(
+        CurrencyInfo memory currencyInfo,
         address _callerAddress,
         uint256 _id
     ) public onlyOwner {
@@ -33,7 +41,7 @@ contract EthPriceOracle is Ownable {
         delete pendingRequests[_id];
         CallerContractInterface callerContractInstance;
         callerContractInstance = CallerContractInterface(_callerAddress);
-        callerContractInstance.callback(_ethPrice, _id);
-        emit SetLatestEthPriceEvent(_ethPrice, _callerAddress);
+        callerContractInstance.callback(currencyInfo, _id);
+        emit UpdateCurrencyInfoEvent(currencyInfo, _callerAddress);
     }
 }
