@@ -9,7 +9,7 @@
     "deploy:prod:all": "npm run deploy:oracle && npm run deploy:caller",
     "deploy:dev:oracle": "cd oracle && npx truffle migrate --reset -all && cd ..",
     "deploy:dev:caller": "cd caller && npx truffle migrate --reset -all && cd ..",
-    "deploy:dev:all": "npm run dev-deploy:oracle && npm run dev-deploy:caller"
+    "deploy:dev:all": "npm run deploy:dev:oracle && npm run deploy:dev:caller"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.5.0",
