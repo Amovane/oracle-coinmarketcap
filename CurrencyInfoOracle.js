@@ -5,7 +5,7 @@ const PRIVATE_KEY_FILE_NAME =
   process.env.PRIVATE_KEY_FILE || "./oracle/oracle_private_key";
 const CHUNK_SIZE = process.env.CHUNK_SIZE || 3;
 const MAX_RETRIES = process.env.MAX_RETRIES || 5;
-const OracleJSON = require("./oracle/build/contracts/EthPriceOracle.json");
+const OracleJSON = require("./oracle/build/contracts/CurrencyInfoOracle.json");
 const { request } = require("./utils/http.js");
 const { utils, Contract } = require("ethers");
 const pendingRequests = [];
@@ -20,13 +20,16 @@ async function getOracleContract(provider) {
 }
 
 async function filterEvents(oracleContract) {
-  oracleContract.on("GetLatestEthPriceEvent", async (callerAddress, id) => {
-    pendingRequests.push({ callerAddress, id });
-  });
+  oracleContract.on(
+    "GetCurrencyInfoEvent",
+    async (callerAddress, currId, id) => {
+      pendingRequests.push({ callerAddress, currId, id });
+    }
+  );
 
   oracleContract.on(
-    "SetLatestEthPriceEvent",
-    async (ethPrice, callerAddress) => {}
+    "UpdateCurrencyInfoEvent",
+    async (currencyInfo, callerAddress) => {}
   );
 }
 
@@ -34,31 +37,39 @@ async function processQueue(oracleContract) {
   let processedRequests = 0;
   while (pendingRequests.length > 0 && processedRequests < CHUNK_SIZE) {
     const req = pendingRequests.shift();
-    await processRequest(oracleContract, req.id, req.callerAddress);
+    await processRequest(oracleContract, req);
     processedRequests++;
   }
 }
 
-async function retrieveLatestEthPrice() {
+async function retrieveCurrencyInfo(id) {
   const resp = await request(
     "get",
-    "https://api.binance.com/api/v3/ticker/price",
-    { symbol: "ETHUSDT" }
+    "https://pro-api.coinmarketcap.com/v2/cryptocurrency/ohlcv/latest",
+    { id: id },
+    { "X-CMC_PRO_API_KEY": process.env.COINMARKETCAP_APIKEY }
   );
-
-  return resp.data.price;
+  console.log(resp);
+  const data = resp.data.data[`${id}`];
+  return { id: data.id, price: data.quote["USD"].close, currency: data.symbol };
 }
 
-async function processRequest(oracleContract, id, callerAddress) {
+async function processRequest(oracleContract, req) {
   let retries = 0;
   while (retries < MAX_RETRIES) {
     try {
-      const ethPrice = await retrieveLatestEthPrice();
-      await setLatestEthPrice(oracleContract, callerAddress, ethPrice, id);
+      const currencyInfo = await retrieveCurrencyInfo(req.currId);
+      await setLatestCurrencyInfo(
+        oracleContract,
+        req.callerAddress,
+        currencyInfo,
+        id
+      );
       return;
     } catch (error) {
+      console.error(error);
       if (retries === MAX_RETRIES - 1) {
-        await setLatestEthPrice(oracleContract, callerAddress, "0", id);
+        console.log("Retry limit was exceeded");
         return;
       }
       retries++;
@@ -66,17 +77,20 @@ async function processRequest(oracleContract, id, callerAddress) {
   }
 }
 
-async function setLatestEthPrice(oracleContract, callerAddress, ethPrice, id) {
-  const ethPriceInt = utils.parseEther(ethPrice);
-  const idInt = parseInt(id);
+async function setLatestCurrencyInfo(
+  oracleContract,
+  callerAddress,
+  currencyInfo,
+  id
+) {
   try {
-    await oracleContract.setLatestEthPrice(
-      ethPriceInt.toString(),
+    await oracleContract.updateCurrencyInfo(
+      currencyInfo,
       callerAddress,
-      idInt.toString()
+      id.toString()
     );
   } catch (error) {
-    console.log("Error encountered while calling setLatestEthPrice.");
+    console.log("Error encountered while calling setLatestCurrencyInfo.");
     // Do some error handling
   }
 }

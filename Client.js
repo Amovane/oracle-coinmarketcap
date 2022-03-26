@@ -5,7 +5,7 @@ const SLEEP_INTERVAL = parseInt(process.env.SLEEP_INTERVAL) || 10_000;
 const PRIVATE_KEY_FILE_NAME =
   process.env.PRIVATE_KEY_FILE || "./caller/caller_private_key";
 const CallerJSON = require("./caller/build/contracts/CallerContract.json");
-const OracleJSON = require("./oracle/build/contracts/EthPriceOracle.json");
+const OracleJSON = require("./oracle/build/contracts/CurrencyInfoOracle.json");
 
 async function getCallerContract(provider) {
   const networkId = (await provider.getNetwork()).chainId;
@@ -17,9 +17,9 @@ async function getCallerContract(provider) {
 }
 
 async function filterEvents(callerContract) {
-  callerContract.on("PriceUpdatedEvent", async (ethPrice, id) => {
+  callerContract.on("CurrencyInfoUpdatedEvent", async (currencyInfo, id) => {
     console.log(
-      `* New PriceUpdated event. requestId: ${id} ethPrice: ${ethPrice}`
+      `* New CurrencyInfoUpdated event. requestId: ${id} currencyInfo: ${currencyInfo}`
     );
   });
 
@@ -44,6 +44,6 @@ async function init() {
 (async () => {
   const callerContract = await init();
   setInterval(async () => {
-    await callerContract.updateEthPrice();
+    await callerContract.updateCurrencyInfo("1"); // bitcoin
   }, SLEEP_INTERVAL);
 })();
